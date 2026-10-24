@@ -12,6 +12,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ffmpeg fonts-dejavu-core \
         tesseract-ocr tesseract-ocr-fas tesseract-ocr-eng \
+        curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
@@ -21,4 +22,9 @@ RUN python -m pip install --upgrade pip \
 
 COPY . .
 
-CMD ["sh", "-c", "python -m alembic upgrade head && exec python main.py"]
+# Healthcheck برای Railway
+HEALTHCHECK --interval=60s --timeout=10s --start-period=90s --retries=3 \
+    CMD python -c "import sys; sys.exit(0)" || exit 1
+
+# بررسی متغیرهای محیطی، migration دیتابیس، و اجرای ربات
+CMD ["sh", "-c", "python startup_check.py && python -m alembic upgrade head && exec python main.py"]

@@ -73,6 +73,29 @@ AI_MAX_TOKENS = int(os.getenv("AI_MAX_TOKENS", "600"))
 AI_TIMEOUT = int(os.getenv("AI_TIMEOUT", "30"))
 AI_SUMMARY_MAX_MESSAGES = int(os.getenv("AI_SUMMARY_MAX_MESSAGES", "300"))
 
+# --- جستجوی معنایی در پیام‌های تلگرام (`.پرسش` درباره‌ی گفتگوهای قبلی) ---
+# پیام‌ها (به‌صورتِ opt-in، با `.ایندکس روشن`) توی دیتابیسِ خودت ایندکس می‌شن و
+# با «embedding» جستجو می‌شن: یعنی «خرید گوشی» با «می‌خوام یه موبایل بخرم» هم
+# مچ می‌شه. embedding از endpointِ استانداردِ `/embeddings` (سازگار با OpenAI)
+# گرفته می‌شه. پیش‌فرض از همون AI_API_KEY/AI_API_BASE استفاده می‌کنه؛ اگه سرویسِ
+# واسطِ تو endpointِ embedding نداره، کلیدِ جدا بده. اگه embedding در دسترس
+# نباشه، جستجو خودکار روی حالتِ کلمه‌ای (با نرمال‌سازیِ فارسی) برمی‌گرده.
+# (با `or` تا مقدارِ خالی در .env هم به پیش‌فرض برگرده)
+AI_EMBED_API_KEY = os.getenv("AI_EMBED_API_KEY") or AI_API_KEY
+AI_EMBED_API_BASE = os.getenv("AI_EMBED_API_BASE") or AI_API_BASE
+AI_EMBED_MODEL = os.getenv("AI_EMBED_MODEL", "text-embedding-3-small")
+# فقط برای مدل‌های خانواده‌ی text-embedding-3 (کوچک‌کردنِ بردار → دیتابیسِ سبک‌تر،
+# مثلاً 512)؛ 0 = ارسال نشه. بعد از تغییرِ مدل/ابعاد باید `.ایندکس بازسازی` بزنی.
+AI_EMBED_DIMENSIONS = max(int(os.getenv("AI_EMBED_DIMENSIONS", "0") or 0), 0)
+# سقفِ تعدادِ پیامِ ایندکس‌شده (قدیمی‌ترین‌ها اول حذف می‌شن) و حداقلِ طولِ پیام
+SEMANTIC_MAX_INDEX = max(int(os.getenv("SEMANTIC_MAX_INDEX", "50000")), 1000)
+SEMANTIC_MIN_CHARS = max(int(os.getenv("SEMANTIC_MIN_CHARS", "4")), 1)
+# حداقلِ شباهتِ کسینوسی برای این‌که یه پیام «مرتبط» حساب بشه (۰ تا ۱)
+SEMANTIC_MIN_SCORE = float(os.getenv("SEMANTIC_MIN_SCORE", "0.27"))
+# نتیجه‌ی جستجو شاملِ پیام‌های چت‌های دیگه‌ست؛ پیش‌فرض توی «پیام‌های ذخیره‌شده» فرستاده می‌شه
+# (تا طرفِ مقابلِ چتی که دستور رو توش زدی نبینه). true = همیشه همون‌جا که دستور زدی نشون بده.
+SEMANTIC_REPLY_IN_PLACE = os.getenv("SEMANTIC_REPLY_IN_PLACE", "false").strip().lower() in ("1", "true", "yes", "on")
+
 # برچسبِ مخفیِ «نوشته‌شده با AI» - به انتهای هر پیامی که واقعاً توسطِ
 # هوش‌مصنوعی تولید و ارسال می‌شه (پاسخِ `.پرسش`/`.خلاصه`/`.ترجمه‌هوشمند`،
 # پاسخِ خودکارِ منشی وقتی `.منشی هوش‌مصنوعی روشن`ه، و ارسالِ `.جواب ارسال`)
@@ -195,3 +218,16 @@ GROUP_SPAM_WINDOW_SECONDS = int(os.getenv("GROUP_SPAM_WINDOW_SECONDS", "10"))
 GROUP_SPAM_MAX_MESSAGES = int(os.getenv("GROUP_SPAM_MAX_MESSAGES", "6"))
 GROUP_SPAM_DUPLICATE_THRESHOLD = int(os.getenv("GROUP_SPAM_DUPLICATE_THRESHOLD", "3"))
 GROUP_SPAM_WARN_COOLDOWN_SECONDS = int(os.getenv("GROUP_SPAM_WARN_COOLDOWN_SECONDS", "20"))
+
+# --- کپی کانال (`.کپی‌کانال`) ---
+# فوروارد دسته‌ایِ همه‌ی پست‌های یک کانال به کانالِ دیگه، با رعایتِ محدودیت‌های
+# تلگرام. مقادیر پیش‌فرض عمداً محافظه‌کارانه‌ان تا ریسکِ FloodWait/محدودشدنِ
+# اکانت کم باشه.
+#   CHANNEL_COPY_BATCH_SIZE    : تعدادِ پیام در هر درخواستِ فوروارد (سقفِ تلگرام ۱۰۰)
+#   CHANNEL_COPY_DELAY_SECONDS : مکثِ بینِ دو درخواستِ فوروارد (ثانیه، حداقل ۳)
+#   CHANNEL_COPY_DAILY_LIMIT   : سقفِ پیامِ کپی‌شده در هر ۲۴ ساعت (پیش‌فرض ۰ = بدونِ سقف)
+CHANNEL_COPY_BATCH_SIZE = max(min(int(os.getenv("CHANNEL_COPY_BATCH_SIZE", "20")), 100), 1)
+CHANNEL_COPY_DELAY_SECONDS = max(float(os.getenv("CHANNEL_COPY_DELAY_SECONDS", "8")), 3.0)
+CHANNEL_COPY_DAILY_LIMIT = max(int(os.getenv("CHANNEL_COPY_DAILY_LIMIT", "0")), 0)
+# فاصله‌ی چک‌کردنِ پیام‌هایِ تازه در حالتِ «از این به بعد» (ثانیه، حداقل ۳۰)
+CHANNEL_COPY_WATCH_SECONDS = max(float(os.getenv("CHANNEL_COPY_WATCH_SECONDS", "60")), 30.0)

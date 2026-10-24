@@ -60,6 +60,7 @@ from bot.handlers.scheduler import scheduler_worker
 from bot.handlers.message_tracker import message_tracker_cleanup_worker
 from bot.handlers.price_alert import price_alert_worker
 from bot.handlers.recurring import recurring_worker
+from bot.handlers.semantic import semantic_index_worker
 from bot.handlers.stats import stats_saver
 from bot.storage.stats_store import save_stats
 from bot.storage.activity_store import flush_message_activity
@@ -210,6 +211,7 @@ async def main():
         message_tracker_cleanup_worker,
         price_alert_worker,
         recurring_worker,
+        semantic_index_worker,
         connection_watchdog,
     ):
         _spawn(_worker())

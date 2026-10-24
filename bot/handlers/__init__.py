@@ -59,4 +59,8 @@ from . import (
     security,
     gamification,
     knowledge,
+    semantic,
 )
+
+# کپی کانال
+from . import channel_copy

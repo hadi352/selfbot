@@ -94,6 +94,14 @@ async def ask_handler(event):
             f"یا `{PREFIX}پرسش این پیام چی میگه؟` برای سوال درباره‌ش."
         )
 
+    # 🧠 سوال درباره‌ی گفتگوهای قبلیِ خودِ کاربر («آخرین باری که درباره‌ی ... صحبت کردم چی گفتیم؟»)
+    # → جستجوی معنایی در پیام‌های ایندکس‌شده (نام/تاریخ/منبع/لینک). با ریپلای روی پیام، مسیرِ قبلی.
+    if question and not event.is_reply:
+        from . import semantic
+
+        if await semantic.should_route(question):
+            return await semantic.answer_recall(event, question)
+
     if context_text and question:
         user_content = f"متنِ زیر رو در نظر بگیر:\n\n{context_text}\n\nسوال: {question}"
     elif context_text:

@@ -16,11 +16,13 @@ import logging
 
 from ..clock import init_clock_state
 from ..storage.assistant_store import init_assistant_state
+from ..repositories import channel_copy_repo
 from ..storage.autopost_store import init_autopost_state
 from ..storage.daily_digest_store import init_daily_digest_state
 from ..storage.font_store import init_font_state
 from ..storage.group_guard_store import init_group_guard_state
 from ..storage.message_tracker_store import init_message_tracker_state
+from ..storage.semantic_store import init_semantic_state
 from ..storage.settings_toggles import init_settings_toggles
 from ..storage.stats_store import init_stats
 
@@ -37,6 +39,9 @@ async def load_all_persistent_state() -> None:
     await init_stats()
     await init_settings_toggles()
     await init_message_tracker_state()
+    await init_semantic_state()
+    # کپی‌کانال: تسکِ زنده‌ی قبل از ری‌استارت وجود نداره؛ کارهای running → paused
+    await channel_copy_repo.mark_running_as_paused()
     logger.info(
         "همه‌ی وضعیت‌های دائمی (منشی/ارسال‌خودکار/خلاصه‌روز/فونت/ساعت/مدیریت‌گروه/آمار/سوییچ‌های سراسری/ردیابِ ویرایش‌وحذف) از PostgreSQL بارگذاری شدن"
     )

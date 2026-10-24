@@ -19,3 +19,11 @@ stats.json
 
 # --- پلاگین‌های نصب‌شده در زمان اجرا ---
 plugins_installed/
+
+# Sensitive files
+.env
+.env.*
+!.env.example
+*.session
+*.session-journal
+secrets/

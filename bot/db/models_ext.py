@@ -8,6 +8,7 @@
 - Settings (تنظیمات یکپارچه)
 - Word Filter (فیلتر کلمات ممنوعه سفارشی)
 - Gradual Warn System (سیستم هشدار تدریجی)
+- Message Index (ایندکسِ پیام‌ها برای جستجوی معنایی)
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from sqlalchemy import (
     Float,
     Index,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -445,3 +447,95 @@ class TaskItem(Base):
 # به InboxItem ستونِ needs_reply اضافه نمی‌کنیم (مایگریشنِ سنگین)؛ دسته‌بندیِ
 # «نیازمند پاسخ» از روی priority + textِ ذخیره‌شده موقعِ triage به priority
 # نگاشت می‌شود: 2=مهم 1=نیاز به پاسخ 0=عادی.
+
+
+# ------------------------------------------------------ Channel Copy ---
+class ChannelCopyTarget(Base):
+    """اسمِ دلخواه برای یک کانالِ مقصد («ذخیره» توی `.کپی‌کانال`) — برای وقتی که آیدی نداریم."""
+
+    __tablename__ = "channel_copy_targets"
+    __table_args__ = (Index("ix_channel_copy_targets_name", "name", unique=True),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ChannelCopyJob(Base):
+    """کارِ «کپی کانال» (`.کپی‌کانال`): پیشرفت ذخیره می‌شه تا بعد از ری‌استارت ادامه پیدا کنه."""
+
+    __tablename__ = "channel_copy_jobs"
+    __table_args__ = (Index("ix_channel_copy_jobs_status", "status"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    source_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    source_title: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    source_ref: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    dest_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    dest_title: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    dest_ref: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # آخرین message_id از مبدأ که پردازش شده (کپی شده یا ردشده)؛ ادامه از بعدِ همین
+    last_id: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    copied: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    skipped: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    total_hint: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # running | paused | done | error
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="paused")
+    drop_author: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # پنجره‌ی ۲۴ساعته‌ی سقفِ روزانه
+    window_start: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    window_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # تاریخِ شروعِ خواسته‌شده («از 1403/05/01»): datetimeِ بدونِ tz به وقتِ کاربر — فقط برایِ نمایش
+    from_date: Mapped[dt.datetime | None] = mapped_column(DateTime, nullable=True)
+    # «از این به بعد»: بعد از رسیدن به آخرِ مبدأ، منتظرِ پیام‌هایِ تازه می‌مونه و خودکار کپی می‌کنه
+    watch: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # کارِ «سازمان‌دهنده»: شناسه‌ی کارهای فرزند (با کاما) — برایِ کپیِ هم‌زمانِ چند کانال
+    children: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    last_error: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+# ----------------------------------------------------------- Message Index ---
+class MessageIndex(Base):
+    """
+    ایندکسِ پیام‌های تلگرام برای جستجوی معنایی (`.پرسش` درباره‌ی گفتگوهای قبلی).
+
+    فقط پیام‌های متنی (یا کپشنِ رسانه) نگه داشته می‌شن. `embedding` بردارِ
+    نرمال‌شده‌ی float16 (bytes) است؛ NULL یعنی هنوز embedding گرفته نشده
+    (مثلاً سرویس در دسترس نبوده) و بعداً خودکار تکمیل می‌شه. `norm_text` نسخه‌ی
+    نرمال‌شده‌ی فارسی (ی/ک، نیم‌فاصله، ارقام) برای جستجوی کلمه‌ایِ پشتیبان.
+    """
+
+    __tablename__ = "message_index"
+    __table_args__ = (
+        UniqueConstraint("chat_id", "message_id", name="uq_message_index_chat_msg"),
+        Index("ix_message_index_chat_date", "chat_id", "date"),
+        Index("ix_message_index_date", "date"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    message_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    chat_title: Mapped[str | None] = mapped_column(Text, nullable=True)
+    chat_username: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    chat_kind: Mapped[str] = mapped_column(String(8), nullable=False, default="user")  # user / group / channel
+    sender_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    sender_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_out: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    norm_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    date: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    embedding: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    embed_model: Mapped[str | None] = mapped_column(String(96), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

@@ -20,6 +20,9 @@ toggles = {
     "message_tracker_enabled": True,
     "autopilot_enabled": False,
     "agent_mode": False,
+    # جستجوی معنایی: ایندکسِ پیام‌ها (opt-in؛ پیش‌فرض خاموش) و مسیریابیِ خودکارِ `.پرسش`
+    "semantic_index_enabled": False,
+    "semantic_auto_route": True,
 }
 
 _KEYS = list(toggles.keys())

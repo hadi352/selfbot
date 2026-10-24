@@ -66,6 +66,9 @@ def _rotating_clock_icon(hour, minute):
 # بوده به‌اشتباه به‌عنوان «نام پایه»ی جدید خونده می‌شه. این تابع، مهم نیست خروجی
 # کدوم‌یک از ۱۵ استایل باشه، پسوند ساعتی رو از انتهای نام (حتی اگه چندلایه و
 # تکرارشده باشه) پاک می‌کنه تا نام پایه‌ی واقعی برگرده.
+# جداکننده‌ی بین نام و ساعت: دو فاصله‌ی غیرشکسته (تلگرام فاصله‌های معمولی پشت‌سرهم رو یکی می‌کنه)
+NAME_CLOCK_SEP = "\u00A0\u00A0"
+
 _DIGIT_CLASS = (
     r"[0-9\u06F0-\u06F9\uFF10-\uFF19\U0001D7D8-\U0001D7E1\U0001D7F6-\U0001D7FF"
     r"\u2460-\u2468\u24EA\U0001D7CE-\U0001D7D7\u2080-\u2089]"
@@ -231,7 +234,7 @@ async def apply_clock_now():
     base = clock_state["base_name"][:40]
     clock_part = CLOCK_STYLES[clock_state["style"]](now.hour, now.minute)
     try:
-        await client(functions.account.UpdateProfileRequest(first_name=f"{base} | {clock_part}"))
+        await client(functions.account.UpdateProfileRequest(first_name=f"{base}{NAME_CLOCK_SEP}{clock_part}"))
     except Exception:
         record_error()
         logger.exception("خطا در اعمال فوری استایل ساعت")
@@ -255,7 +258,7 @@ async def clock_updater():
                 key = (clock_state["style"], base, now.hour, now.minute)
                 if key != last_sent:
                     clock_part = CLOCK_STYLES[clock_state["style"]](now.hour, now.minute)
-                    new_name = f"{base} | {clock_part}"
+                    new_name = f"{base}{NAME_CLOCK_SEP}{clock_part}"
                     await client(functions.account.UpdateProfileRequest(first_name=new_name))
                     last_sent = key
                     await persist_clock_state()
